@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>기억 포커</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --felt:#dfe9e3; --felt-2:#cddcd3; --ink:#14261f; --muted:#4d6359;
+  --card:#fbf8ef; --card-ink:#1b1b1b; --red:#b3261e; --brass:#9a7420;
+  --back:#1f5546; --back-2:#17463a; --sel:#d9a21b; --line:rgba(20,38,31,.18);
+  --btn:#14261f; --btn-ink:#f4f1e6;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --felt:#0e2f28; --felt-2:#0a241f; --ink:#ecf0e6; --muted:#9fb5aa;
+    --card:#f4efe2; --card-ink:#1b1b1b; --red:#b3261e; --brass:#d4ad55;
+    --back:#2c6b59; --back-2:#225446; --sel:#e8b434; --line:rgba(236,240,230,.16);
+    --btn:#e8b434; --btn-ink:#14261f; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --felt:#0e2f28; --felt-2:#0a241f; --ink:#ecf0e6; --muted:#9fb5aa;
+  --card:#f4efe2; --card-ink:#1b1b1b; --red:#b3261e; --brass:#d4ad55;
+  --back:#2c6b59; --back-2:#225446; --sel:#e8b434; --line:rgba(236,240,230,.16);
+  --btn:#e8b434; --btn-ink:#14261f; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--felt);color:var(--ink);
+  font-family:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  line-height:1.5;min-height:100%}
+#app{max-width:460px;margin:0 auto;padding:20px 16px 40px}
+h1{font-family:"Playfair Display","Noto Serif KR",Georgia,serif;font-weight:900;font-size:2.4rem;line-height:1.05;margin:8px 0 4px;letter-spacing:-.01em}
+h2{font-size:1.15rem;margin:0}
+p{margin:.4em 0}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+button{font:inherit;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,.slot:focus-visible{outline:3px solid var(--sel);outline-offset:2px}
+.btn{background:var(--btn);color:var(--btn-ink);border:0;border-radius:10px;padding:13px 18px;font-weight:700;width:100%;font-size:1rem}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.row{display:flex;gap:10px;align-items:center}
+.stack>*+*{margin-top:12px}
+
+/* setup */
+.field{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.field label{font-weight:600}
+select,input[type=text]{font:inherit;background:var(--felt-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+input[type=text]{width:100%;min-width:0}
+.player-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper button{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--felt-2);color:var(--ink);font-size:1.1rem}
+.stepper span{min-width:2ch;text-align:center;font-weight:700}
+
+/* top bar */
+.bar{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.timer{font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:2.6rem;line-height:1;font-variant-numeric:tabular-nums}
+.timer.low{color:var(--red)}
+.track{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:14px}
+.track i{display:block;height:100%;background:var(--sel);transition:width .25s linear}
+
+/* cards */
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.slot{position:relative;aspect-ratio:5/7;border-radius:8px;border:0;padding:0;background:none;perspective:600px}
+.face,.back{position:absolute;inset:0;border-radius:8px;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;transition:transform .5s ease}
+.face{background:var(--card);color:var(--card-ink);box-shadow:0 1px 0 rgba(0,0,0,.25);flex-direction:column;line-height:1}
+.face.red{color:var(--red)}
+.face .r{font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:clamp(1.2rem,6vw,1.7rem)}
+.face .s{font-size:clamp(1.1rem,5.5vw,1.5rem);margin-top:2px}
+.face .tag{position:absolute;top:4px;left:6px;font-size:.62rem;color:#7a7568;font-weight:700}
+.back{transform:rotateY(180deg);color:#f4efe2;font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:clamp(1.4rem,7vw,2rem);
+  background:repeating-linear-gradient(45deg,var(--back) 0 6px,var(--back-2) 6px 12px);border:3px solid var(--card)}
+.slot.down .face{transform:rotateY(-180deg)}
+.slot.down .back{transform:rotateY(0)}
+.slot.picked .back{background:var(--sel);color:#14261f;border-color:var(--sel)}
+.slot.picked{transform:translateY(-4px)}
+.slot.dim{opacity:.35}
+.slot.hit .face{box-shadow:0 0 0 3px var(--sel)}
+@media (prefers-reduced-motion:reduce){.face,.back,.track i{transition:none}}
+
+.community{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:270px;margin:0 auto 16px}
+.section-label{font-size:.85rem;color:var(--muted);margin:0 0 6px;font-weight:600}
+.mini{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.mini .slot .face .r{font-size:1.05rem}.mini .slot .face .s{font-size:.95rem}
+.mini .slot .face .tag{font-size:.55rem}
+
+.handoff{text-align:center;padding:60px 0}
+.handoff .who{font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:2.2rem;margin:10px 0}
+
+.result{padding:14px 0;border-bottom:1px solid var(--line)}
+.result .row{justify-content:space-between;margin-bottom:8px}
+.result.win h2::after{content:" 승리";color:var(--brass);font-size:.9rem}
+.hand{font-weight:700}
+.place{font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:1.4rem;width:1.6em;color:var(--muted)}
+.result.win .place{color:var(--brass)}
+.score{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.9rem;margin:6px 0 16px}
+details{margin-top:14px}
+summary{cursor:pointer;font-weight:600}
+.chosen{font-size:.85rem;color:var(--muted)}
+.choice{border-top:1px solid var(--line);padding:18px 0}
+.choice h2{margin-bottom:4px}
+.code{font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:3.4rem;letter-spacing:.12em;line-height:1;margin:6px 0 2px}
+.join{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+.join input{text-transform:uppercase;letter-spacing:.2em;font-weight:700;text-align:center}
+.join .btn{width:auto}
+.plist{list-style:none;padding:0;margin:12px 0}
+.plist li{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+.tagp{font-size:.8rem;color:var(--muted)}
+.notice{background:var(--felt-2);border-radius:10px;padding:12px 14px;font-size:.9rem;margin:12px 0}
+.notice.err{color:var(--red)}
+.back-link{background:none;border:0;color:var(--muted);padding:4px 0;margin-bottom:6px;font-size:.9rem}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const SUITS=['♠','♥','♦','♣'];
+const RN={11:'J',12:'Q',13:'K',14:'A'};
+const LETTERS='ABCDEFGHIJKLMNOP'.split('');
+const HANDS=['하이카드','원페어','투페어','트리플','스트레이트','플러시','풀하우스','포카드','스트레이트 플러시','로열 플러시'];
+const AI_LEVEL={easy:{p:.4,label:'쉬움'},normal:{p:.65,label:'보통'},hard:{p:.9,label:'어려움'}};
+const app=document.getElementById('app');
+
+let cfg={players:[{name:'플레이어 1',type:'human'},{name:'AI 1',type:'ai',level:'normal'}],memT:30,selT:30};
+let S={};let timer=null;let wins={};
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function deck(){const d=[];for(let s=0;s<4;s++)for(let r=2;r<=14;r++)d.push({r,s});return shuffle(d)}
+const rs=r=>RN[r]||String(r);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function evaluate(cs){
+  const r=cs.map(c=>c.r).sort((a,b)=>b-a);
+  const flush=cs.every(c=>c.s===cs[0].s);
+  const u=[...new Set(r)];let sh=0;
+  if(u.length===5){if(u[0]-u[4]===4)sh=u[0];else if(u.join()==='14,5,4,3,2')sh=5}
+  const cnt={};r.forEach(x=>cnt[x]=(cnt[x]||0)+1);
+  const g=Object.entries(cnt).map(([k,n])=>[n,+k]).sort((a,b)=>b[0]-a[0]||b[1]-a[1]);
+  const k=g.map(x=>x[1]);
+  if(sh&&flush)return{cat:sh===14?9:8,tb:[sh]};
+  if(g[0][0]===4)return{cat:7,tb:k};
+  if(g[0][0]===3&&g[1][0]===2)return{cat:6,tb:k};
+  if(flush)return{cat:5,tb:r};
+  if(sh)return{cat:4,tb:[sh]};
+  if(g[0][0]===3)return{cat:3,tb:k};
+  if(g[0][0]===2&&g[1][0]===2)return{cat:2,tb:k};
+  if(g[0][0]===2)return{cat:1,tb:k};
+  return{cat:0,tb:r};
+}
+function cmp(a,b){if(a.cat!==b.cat)return a.cat-b.cat;for(let i=0;i<Math.max(a.tb.length,b.tb.length);i++){const d=(a.tb[i]||0)-(b.tb[i]||0);if(d)return d}return 0}
+function handName(e){
+  const n=HANDS[e.cat];
+  if(e.cat===0)return `${n} (${rs(e.tb[0])})`;
+  if(e.cat===1||e.cat===3||e.cat===7)return `${rs(e.tb[0])} ${n}`;
+  if(e.cat===2)return `${rs(e.tb[0])}·${rs(e.tb[1])} ${n}`;
+  if(e.cat===4||e.cat===8)return `${rs(e.tb[0])} 하이 ${n}`;
+  if(e.cat===6)return `${rs(e.tb[0])} 풀 오브 ${rs(e.tb[1])}`;
+  return n;
+}
+
+function cardHTML(c,{down=false,letter='',picked=false,tag=false,cls='',clickable=false,idx=-1}={}){
+  const red=c&&(c.s===1||c.s===2);
+  const el=clickable?'button':'div';
+  const attrs=clickable?` type="button" data-i="${idx}" aria-label="${letter} 카드${picked?' 선택됨':''}" aria-pressed="${picked}"`:'';
+  return `<${el} class="slot${down?' down':''}${picked?' picked':''} ${cls}"${attrs}>
+    <div class="face${red?' red':''}">${tag?`<span class="tag">${letter}</span>`:''}${c?`<span class="r">${rs(c.r)}</span><span class="s">${SUITS[c.s]}</span>`:''}</div>
+    <div class="back">${letter}</div></${el}>`;
+}
+
+function stopTimer(){if(timer){clearInterval(timer);timer=null}}
+function startTimer(sec,onTick,onEnd){
+  stopTimer();const end=Date.now()+sec*1000;
+  const tick=()=>{const left=Math.max(0,(end-Date.now())/1000);onTick(left,sec);if(left<=0){stopTimer();onEnd()}};
+  tick();timer=setInterval(tick,200);
+}
+function timerUI(left,total){
+  const t=document.querySelector('.timer'),b=document.querySelector('.track i');
+  if(t){t.textContent=Math.ceil(left);t.classList.toggle('low',left<=5)}
+  if(b)b.style.width=(left/total*100)+'%';
+}
+
+/* ---------- setup ---------- */
+function renderSetup(){
+  stopTimer();
+  const p=cfg.players;
+  app.innerHTML=`
+  <button class="back-link" id="home" type="button">‹ 처음으로</button>
+  <h1>한 기기로 플레이</h1>
+  <p class="muted">16장을 외우고, 가려진 카드 중 2장을 골라 공개 카드 3장과 함께 가장 높은 족보를 만드세요.</p>
+  <div class="stack" style="margin-top:18px">
+    <div class="field"><label>플레이어 수</label>
+      <div class="stepper"><button type="button" id="minus" aria-label="플레이어 줄이기">−</button><span>${p.length}</span><button type="button" id="plus" aria-label="플레이어 늘리기">+</button></div></div>
+    <div>${p.map((pl,i)=>`
+      <div class="player-row">
+        <input type="text" data-name="${i}" value="${esc(pl.name)}" maxlength="12" aria-label="플레이어 ${i+1} 이름">
+        <select data-type="${i}" aria-label="플레이어 ${i+1} 종류">
+          <option value="human"${pl.type==='human'?' selected':''}>사람</option>
+          ${Object.entries(AI_LEVEL).map(([k,v])=>`<option value="ai:${k}"${pl.type==='ai'&&pl.level===k?' selected':''}>AI ${v.label}</option>`).join('')}
+        </select>
+      </div>`).join('')}</div>
+    <div class="field"><label for="memT">암기 시간</label>
+      <select id="memT">${[10,20,30,45,60].map(s=>`<option${s===cfg.memT?' selected':''} value="${s}">${s}초</option>`).join('')}</select></div>
+    <div class="field"><label for="selT">선택 시간</label>
+      <select id="selT">${[10,20,30,45,60].map(s=>`<option${s===cfg.selT?' selected':''} value="${s}">${s}초</option>`).join('')}</select></div>
+    <p class="small muted">사람 플레이어가 여럿이면 한 기기를 돌려가며 차례대로 고릅니다. 같은 카드를 여러 명이 골라도 됩니다.</p>
+    <button class="btn" id="start" type="button">게임 시작</button>
+  </div>`;
+  app.querySelector('#home').onclick=()=>renderHome();
+  app.querySelector('#minus').onclick=()=>{if(p.length>2){p.pop();renderSetup()}};
+  app.querySelector('#plus').onclick=()=>{if(p.length<8){const n=p.length+1;p.push({name:`AI ${n-1}`,type:'ai',level:'normal'});renderSetup()}};
+  app.querySelectorAll('[data-name]').forEach(el=>el.oninput=()=>{p[+el.dataset.name].name=el.value});
+  app.querySelectorAll('[data-type]').forEach(el=>el.onchange=()=>{
+    const i=+el.dataset.type,[t,l]=el.value.split(':');p[i].type=t;if(l)p[i].level=l;});
+  app.querySelector('#memT').onchange=e=>cfg.memT=+e.target.value;
+  app.querySelector('#selT').onchange=e=>cfg.selT=+e.target.value;
+  app.querySelector('#start').onclick=()=>{
+    p.forEach((pl,i)=>{pl.name=(pl.name||'').trim()||`플레이어 ${i+1}`});
+    newRound();
+  };
+}
+
+/* ---------- round ---------- */
+function newRound(){
+  const d=deck();
+  S={board:d.slice(0,16),community:d.slice(16,19),rest:d.slice(19),
+     picks:cfg.players.map(()=>null),queue:[],cur:-1,sel:[]};
+  cfg.players.forEach(pl=>{if(!(pl.name in wins))wins[pl.name]=0});
+  renderMemorize();
+}
+
+function renderMemorize(){
+  app.innerHTML=`
+  <div class="bar"><h2>카드를 외우세요</h2><span class="timer">${cfg.memT}</span></div>
+  <div class="track"><i style="width:100%"></i></div>
+  <div class="grid">${S.board.map((c,i)=>cardHTML(c,{letter:LETTERS[i]})).join('')}</div>
+  <p class="small muted" style="margin-top:12px">시간이 끝나면 카드가 뒤집히고 공개 카드 3장이 나옵니다.</p>
+  <button class="btn ghost" id="skip" type="button" style="margin-top:8px">다 외웠어요</button>`;
+  app.querySelector('#skip').onclick=()=>{stopTimer();flipDown()};
+  startTimer(cfg.memT,timerUI,flipDown);
+}
+
+function flipDown(){
+  // AI players decide using imperfect memory
+  cfg.players.forEach((pl,i)=>{if(pl.type==='ai')S.picks[i]=aiPick(AI_LEVEL[pl.level].p)});
+  S.queue=cfg.players.map((pl,i)=>pl.type==='human'?i:-1).filter(i=>i>=0);
+  nextHuman();
+}
+
+function aiPick(p){
+  const believed=S.board.map(c=>Math.random()<p?c:{r:2+Math.floor(Math.random()*13),s:Math.floor(Math.random()*4)});
+  let best=null,bp=[0,1];
+  for(let a=0;a<16;a++)for(let b=a+1;b<16;b++){
+    const e=evaluate([believed[a],believed[b],...S.community]);
+    if(!best||cmp(e,best)>0){best=e;bp=[a,b]}
+  }
+  return bp;
+}
+
+function nextHuman(){
+  stopTimer();
+  if(!S.queue.length)return renderResults();
+  S.cur=S.queue.shift();S.sel=[];
+  const humans=cfg.players.filter(p=>p.type==='human').length;
+  if(humans>1)renderHandoff();else renderSelect();
+}
+
+function renderHandoff(){
+  const pl=cfg.players[S.cur];
+  app.innerHTML=`<div class="handoff">
+    <p class="muted">다음 차례</p>
+    <div class="who">${esc(pl.name)}</div>
+    <p class="muted small">다른 플레이어는 화면을 보지 마세요. 시작하면 ${cfg.selT}초 안에 2장을 고릅니다.</p>
+    <button class="btn" id="go" type="button" style="margin-top:24px">선택 시작</button></div>`;
+  app.querySelector('#go').onclick=renderSelect;
+}
+
+function renderSelect(){
+  const pl=cfg.players[S.cur];
+  app.innerHTML=`
+  <div class="bar"><h2>${esc(pl.name)}, 2장을 고르세요</h2><span class="timer">${cfg.selT}</span></div>
+  <div class="track"><i style="width:100%"></i></div>
+  <p class="section-label">공개 카드</p>
+  <div class="community">${S.community.map(c=>cardHTML(c)).join('')}</div>
+  <div class="grid" id="g"></div>
+  <p class="small muted" id="info" style="margin:12px 0 8px"></p>
+  <button class="btn" id="ok" type="button">이 2장으로 결정</button>`;
+  drawPickGrid();
+  app.querySelector('#ok').onclick=confirmPick;
+  startTimer(cfg.selT,timerUI,()=>{
+    while(S.sel.length<2){const r=Math.floor(Math.random()*16);if(!S.sel.includes(r))S.sel.push(r)}
+    confirmPick(true);
+  });
+}
+function drawPickGrid(){
+  const g=app.querySelector('#g');
+  g.innerHTML=S.board.map((c,i)=>cardHTML(null,{down:true,letter:LETTERS[i],picked:S.sel.includes(i),clickable:true,idx:i})).join('');
+  g.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.i;
+    if(S.sel.includes(i))S.sel=S.sel.filter(x=>x!==i);
+    else if(S.sel.length<2)S.sel.push(i);
+    else S.sel=[S.sel[1],i];
+    drawPickGrid();
+    app.querySelector(`[data-i="${i}"]`).focus();
+  });
+  app.querySelector('#info').textContent=S.sel.length?`선택: ${S.sel.map(i=>LETTERS[i]).join(', ')}`:'시간 안에 못 고르면 남은 칸은 무작위로 채워집니다.';
+  app.querySelector('#ok').disabled=S.sel.length!==2;
+}
+function confirmPick(){
+  stopTimer();
+  S.picks[S.cur]=[...S.sel];
+  nextHuman();
+}
+
+/* ---------- results ---------- */
+function renderResults(){
+  stopTimer();
+  const res=cfg.players.map((pl,i)=>{
+    const pk=S.picks[i],cards=[...pk.map(x=>S.board[x]),...S.community];
+    return{i,pl,pk,cards,e:evaluate(cards)};
+  }).sort((a,b)=>cmp(b.e,a.e));
+  const top=res[0].e;
+  const winners=res.filter(r=>cmp(r.e,top)===0);
+  winners.forEach(w=>wins[w.pl.name]=(wins[w.pl.name]||0)+1);
+  let place=1;
+  res.forEach((r,k)=>{if(k>0&&cmp(r.e,res[k-1].e)!==0)place=k+1;r.place=place});
+  const allPicked=new Set(res.flatMap(r=>r.pk));
+  app.innerHTML=`
+  <h1>${winners.length>1?'무승부':esc(winners[0].pl.name)}</h1>
+  <p class="muted">${winners.length>1?`${winners.map(w=>esc(w.pl.name)).join(', ')} 공동 1위`:'라운드 승리'} · ${handName(top)}</p>
+  <div class="score">${cfg.players.map(p=>`<span>${esc(p.name)} <b>${wins[p.name]||0}</b>승</span>`).join('')}</div>
+  ${res.map(r=>`
+    <div class="result${r.place===1?' win':''}">
+      <div class="row"><div class="row"><span class="place">${r.place}</span><h2>${esc(r.pl.name)}</h2></div><span class="hand">${handName(r.e)}</span></div>
+      <div class="mini">${r.cards.map((c,k)=>cardHTML(c,{letter:k<2?LETTERS[r.pk[k]]:'',tag:k<2})).join('')}</div>
+      <p class="chosen">고른 카드 ${r.pk.map(x=>LETTERS[x]).join(', ')}${r.pl.type==='ai'?` · AI ${AI_LEVEL[r.pl.level].label}`:''}</p>
+    </div>`).join('')}
+  <details><summary>전체 카드 보기</summary>
+    <p class="section-label" style="margin-top:10px">공개 카드</p>
+    <div class="community">${S.community.map(c=>cardHTML(c)).join('')}</div>
+    <div class="grid">${S.board.map((c,i)=>cardHTML(c,{letter:LETTERS[i],tag:true,cls:allPicked.has(i)?'hit':''})).join('')}</div>
+    <p class="small muted" style="margin-top:8px">테두리가 있는 카드가 누군가 고른 카드입니다.</p>
+  </details>
+  <div class="stack" style="margin-top:20px">
+    <button class="btn" id="again" type="button">다음 라운드</button>
+    <button class="btn ghost" id="setup" type="button">설정 바꾸기</button>
+    <button class="btn ghost" id="home" type="button">처음으로</button>
+  </div>`;
+  app.querySelector('#again').onclick=newRound;
+  app.querySelector('#setup').onclick=renderSetup;
+  app.querySelector('#home').onclick=()=>renderHome();
+  window.scrollTo(0,0);
+}
+
+/* ================= online (PeerJS, host-authoritative) ================= */
+const PREFIX='memorypoker-v1-';
+const NET={role:null,peer:null,conn:null,conns:new Map(),code:null,myId:null,view:null,key:'',sel:[],submitting:false,deadline:0,tick:null,joinTimer:null};
+const H={players:[],round:0,memT:30,selT:30,phase:'lobby',board:null,community:null,picks:{},auto:{},roster:[],wins:{},timer:null,phaseEnd:0,results:null};
+const loadName=()=>{try{return localStorage.getItem('mp-name')||''}catch(e){return ''}};
+const saveName=n=>{try{localStorage.setItem('mp-name',n)}catch(e){}};
+const cleanName=n=>String(n||'').replace(/\s+/g,' ').trim().slice(0,12)||'플레이어';
+function codeFromHash(){const m=location.hash.match(/^#([A-Za-z]{4})$/);return m?m[1].toUpperCase():null}
+function clearHash(){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){location.hash=''}}
+function roomLink(){return location.origin+location.pathname+'#'+NET.code}
+
+function renderHome(msg){
+  stopTimer();
+  const pre=codeFromHash()||'';
+  const netOk=typeof Peer!=='undefined';
+  app.innerHTML=`
+  <h1>기억 포커</h1>
+  <p class="muted">16장을 외우고, 가려진 카드 중 2장을 골라 공개 카드 3장과 함께 가장 높은 족보를 만드세요.</p>
+  ${msg?`<div class="notice err">${esc(msg)}</div>`:''}
+  <div class="choice">
+    <h2>온라인으로 플레이</h2>
+    <p class="small muted">링크만 있으면 누구나 각자 기기에서 들어올 수 있어요.</p>
+    ${netOk?`
+    <div class="field"><label for="nick">닉네임</label><input type="text" id="nick" maxlength="12" value="${esc(loadName())}" placeholder="이름" style="max-width:60%"></div>
+    <div class="join"><input type="text" id="code" maxlength="4" placeholder="방 코드" aria-label="방 코드" autocomplete="off" value="${pre}"><button class="btn" id="join" type="button">참가</button></div>
+    <button class="btn ghost" id="create" type="button" style="margin-top:10px">새 방 만들기</button>`
+    :`<div class="notice err">온라인 모듈을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침하세요.</div>`}
+  </div>
+  <div class="choice">
+    <h2>한 기기로 플레이</h2>
+    <p class="small muted">AI와 대결하거나, 기기 하나를 돌려가며 함께 합니다.</p>
+    <button class="btn ghost" id="local" type="button" style="margin-top:10px">한 기기로 시작</button>
+  </div>`;
+  app.querySelector('#local').onclick=()=>{netLeave(true);renderSetup()};
+  if(!netOk)return;
+  const nick=app.querySelector('#nick'),inp=app.querySelector('#code');
+  const name=()=>{const n=cleanName(nick.value);saveName(n);return n};
+  app.querySelector('#create').onclick=()=>hostCreate(name());
+  const go=()=>{const c=inp.value.trim().toUpperCase();if(/^[A-Z]{4}$/.test(c))clientJoin(c,name());else inp.focus()};
+  app.querySelector('#join').onclick=go;
+  inp.onkeydown=e=>{if(e.key==='Enter')go()};
+  if(pre&&!loadName())nick.focus();
+}
+window.addEventListener('hashchange',()=>{if(!NET.role&&codeFromHash()&&!app.querySelector('#nick'))renderHome()});
+
+function connecting(t){app.innerHTML=`<p class="muted" style="padding:40px 0">${esc(t)}</p><button class="btn ghost" id="cancel" type="button">취소</button>`;app.querySelector('#cancel').onclick=()=>{netLeave(true);clearHash();renderHome()}}
+
+/* ---------- host ---------- */
+function hostCreate(name,tries=0){
+  netLeave(true);
+  const A='ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const code=Array.from({length:4},()=>A[Math.floor(Math.random()*A.length)]).join('');
+  connecting('방을 만드는 중…');
+  const peer=new Peer(PREFIX+code);
+  NET.peer=peer;NET.role='host';NET.code=code;
+  peer.on('open',id=>{
+    NET.myId=id;
+    Object.assign(H,{players:[{id,name}],round:0,phase:'lobby',picks:{},auto:{},roster:[],wins:{},results:null});
+    location.hash=code;
+    NET.tick=setInterval(netTick,250);
+    hostBroadcast();
+  });
+  peer.on('connection',conn=>{
+    conn.on('data',d=>hostOnMsg(conn,d));
+    conn.on('close',()=>hostDrop(conn.peer));
+    conn.on('error',()=>hostDrop(conn.peer));
+  });
+  peer.on('error',e=>{
+    if(e.type==='unavailable-id'&&tries<5)return hostCreate(name,tries+1);
+    if(NET.role==='host'&&NET.myId&&e.type==='peer-unavailable')return;
+    netLeave(true);renderHome('서버에 연결하지 못했어요. 잠시 후 다시 시도하세요.');
+  });
+  peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
+}
+function hostOnMsg(conn,d){
+  if(!d||typeof d!=='object')return;
+  const id=conn.peer;
+  if(d.t==='hello'){
+    if(H.players.length>=8&&!H.players.some(p=>p.id===id)){conn.send({t:'full'});return setTimeout(()=>conn.close(),300)}
+    NET.conns.set(id,conn);
+    const p=H.players.find(p=>p.id===id);
+    if(p)p.name=cleanName(d.name);else H.players.push({id,name:cleanName(d.name)});
+    return hostBroadcast();
+  }
+  if(d.t==='pick')hostPick(id,d.picks);
+}
+function hostPick(id,picks){
+  if(H.phase!=='select'||!H.roster.includes(id)||H.picks[id])return;
+  if(!Array.isArray(picks)||picks.length!==2)return;
+  const [a,b]=picks.map(Number);
+  if(!(a>=0&&a<16&&b>=0&&b<16&&a!==b&&Number.isInteger(a)&&Number.isInteger(b)))return;
+  H.picks[id]=[a,b];
+  if(H.roster.every(x=>H.picks[x]))hostEndSelect();else hostBroadcast();
+}
+function hostDrop(id){
+  NET.conns.delete(id);
+  H.players=H.players.filter(p=>p.id!==id);
+  if(!H.picks[id])H.roster=H.roster.filter(x=>x!==id);
+  if(H.phase==='select'&&H.roster.length&&H.roster.every(x=>H.picks[x]))return hostEndSelect();
+  hostBroadcast();
+}
+function hostStart(){
+  if(H.players.length<2)return;
+  clearTimeout(H.timer);
+  const d=deck();
+  Object.assign(H,{round:H.round+1,board:d.slice(0,16),community:d.slice(16,19),roster:H.players.map(p=>p.id),picks:{},auto:{},results:null,phase:'memorize',phaseEnd:Date.now()+H.memT*1000});
+  H.timer=setTimeout(hostToSelect,H.memT*1000);
+  hostBroadcast();
+}
+function hostToSelect(){
+  H.phase='select';H.phaseEnd=Date.now()+H.selT*1000;
+  H.timer=setTimeout(hostEndSelect,H.selT*1000+1500);
+  hostBroadcast();
+}
+function hostEndSelect(){
+  clearTimeout(H.timer);
+  H.roster.forEach(id=>{if(!H.picks[id]){const s=[];while(s.length<2){const r=Math.floor(Math.random()*16);if(!s.includes(r))s.push(r)}H.picks[id]=s;H.auto[id]=true}});
+  const names=Object.fromEntries(H.players.map(p=>[p.id,p.name]));
+  const res=H.roster.map(id=>({id,name:names[id]||'나간 플레이어',pk:H.picks[id],auto:!!H.auto[id],e:evaluate([...H.picks[id].map(x=>H.board[x]),...H.community])}));
+  const top=res.reduce((a,b)=>!a||cmp(b.e,a.e)>0?b:a,null);
+  if(top)res.filter(r=>cmp(r.e,top.e)===0).forEach(r=>H.wins[r.id]=(H.wins[r.id]||0)+1);
+  H.results=res.map(({e,...r})=>r);
+  H.phase='results';H.phaseEnd=0;
+  hostBroadcast();
+}
+function hostView(id){
+  const ph=H.phase;
+  return{code:NET.code,phase:ph,round:H.round,hostId:NET.myId,me:id,memT:H.memT,selT:H.selT,
+    players:H.players.map(p=>({id:p.id,name:p.name})),
+    remainMs:Math.max(0,H.phaseEnd-Date.now()),
+    inRoster:H.roster.includes(id),
+    submitted:H.roster.filter(x=>H.picks[x]).length,rosterSize:H.roster.length,
+    myPick:H.picks[id]||null,
+    board:(ph==='memorize'||ph==='results')?H.board:null,
+    community:(ph==='select'||ph==='results')?H.community:null,
+    results:ph==='results'?H.results:null,
+    wins:H.wins};
+}
+function hostBroadcast(){
+  NET.conns.forEach((c,id)=>{try{if(c.open)c.send({t:'state',s:hostView(id)})}catch(e){}});
+  applyView(hostView(NET.myId));
+}
+
+/* ---------- client ---------- */
+function clientJoin(code,name){
+  netLeave(true);
+  connecting(`방 ${code}에 들어가는 중…`);
+  const peer=new Peer();
+  NET.peer=peer;NET.role='client';NET.code=code;
+  if(location.hash!=='#'+code)location.hash=code;
+  NET.joinTimer=setTimeout(()=>{if(!NET.view){netLeave(true);renderHome(`방 ${code}에 연결하지 못했어요. 코드를 확인하거나 다른 네트워크(와이파이/데이터)로 시도해 보세요.`)}},15000);
+  peer.on('open',id=>{
+    NET.myId=id;
+    const conn=peer.connect(PREFIX+code,{reliable:true});
+    NET.conn=conn;
+    conn.on('open',()=>conn.send({t:'hello',name}));
+    conn.on('data',d=>{
+      if(d&&d.t==='state'){clearTimeout(NET.joinTimer);applyView(d.s)}
+      else if(d&&d.t==='full'){netLeave(true);renderHome('방이 가득 찼어요 (최대 8명).')}
+    });
+    conn.on('close',()=>{if(NET.role==='client'){netLeave(true);renderHome('방장과의 연결이 끊겼어요. 방이 닫혔을 수 있어요.')}});
+  });
+  peer.on('error',e=>{
+    if(NET.role!=='client')return;
+    netLeave(true);
+    renderHome(e.type==='peer-unavailable'?`방 ${code}을(를) 찾을 수 없어요. 코드를 확인하세요.`:'서버에 연결하지 못했어요. 잠시 후 다시 시도하세요.');
+  });
+  NET.tick=setInterval(netTick,250);
+}
+function netSendPick(sel){
+  if(NET.submitting||sel.length!==2)return;
+  NET.submitting=true;
+  if(NET.role==='host')hostPick(NET.myId,sel);
+  else try{NET.conn.send({t:'pick',picks:sel})}catch(e){NET.submitting=false}
+  setTimeout(()=>{NET.submitting=false},2000);
+}
+function netLeave(silent){
+  clearInterval(NET.tick);clearTimeout(NET.joinTimer);clearTimeout(H.timer);
+  NET.conns.forEach(c=>{try{c.close()}catch(e){}});
+  try{NET.peer&&NET.peer.destroy()}catch(e){}
+  Object.assign(NET,{role:null,peer:null,conn:null,conns:new Map(),code:null,myId:null,view:null,key:'',sel:[],submitting:false,deadline:0,tick:null,joinTimer:null});
+  if(!silent)clearHash();
+}
+
+/* ---------- shared render ---------- */
+function vKey(v){return [v.phase,v.round,!!v.myPick,v.inRoster].join('|')}
+function applyView(v){
+  const prev=NET.view;NET.view=v;
+  if(!prev||prev.phase!==v.phase||prev.round!==v.round)NET.deadline=Date.now()+v.remainMs;
+  const key=vKey(v);
+  if(key!==NET.key){
+    if(v.phase==='select'&&!v.myPick&&(!prev||prev.phase!=='select'||prev.round!==v.round))NET.sel=[];
+    NET.key=key;return netRender();
+  }
+  if(['lobby','results'].includes(v.phase)||v.myPick)return netRender();
+  const c=app.querySelector('#count');if(c)c.textContent=countText();
+}
+function netTick(){
+  const v=NET.view;if(!v)return;
+  const left=Math.max(0,(NET.deadline-Date.now())/1000);
+  if(v.phase==='memorize')timerUI(Math.min(v.memT,left),v.memT);
+  if(v.phase==='select'){
+    timerUI(Math.min(v.selT,left),v.selT);
+    if(left<=0&&v.inRoster&&!v.myPick&&!NET.submitting){
+      const s=[...NET.sel];while(s.length<2){const r=Math.floor(Math.random()*16);if(!s.includes(r))s.push(r)}
+      netSendPick(s);
+    }
+  }
+}
+const nameOf=id=>{const v=NET.view;const p=v.players.find(p=>p.id===id);return (p?p.name:'나간 플레이어')+(id===v.me?' (나)':'')};
+const countText=()=>`제출 ${NET.view.submitted} / ${NET.view.rosterSize}명`;
+const isHost=()=>NET.role==='host';
+function roomHeader(){return `<div class="bar"><button class="back-link" id="leave" type="button">‹ ${isHost()?'방 닫기':'방 나가기'}</button><span class="tagp">방 ${NET.code}</span></div>`}
+function bindLeave(){const b=app.querySelector('#leave');if(b)b.onclick=()=>{if(isHost()&&NET.view.players.length>1&&!confirm('방을 닫으면 모든 플레이어의 게임이 끝나요. 닫을까요?'))return;netLeave();renderHome()}}
+
+function netRender(){
+  const v=NET.view;
+  if(v.phase==='lobby')return renderLobby();
+  if(!v.inRoster&&v.phase!=='results')return renderSpectate();
+  if(v.phase==='memorize')return renderOnMemorize();
+  if(v.phase==='select'&&!v.myPick)return renderOnSelect();
+  if(v.phase==='select')return renderOnWait();
+  return renderOnResults();
+}
+function renderLobby(){
+  const v=NET.view,host=isHost();
+  app.innerHTML=`${roomHeader()}
+  <p class="muted" style="margin-top:20px">방 코드</p>
+  <div class="code">${v.code}</div>
+  <p class="small muted">아래 링크를 보내거나 코드를 알려주세요.</p>
+  ${host?`<div class="row" style="margin:10px 0"><button class="btn" id="share" type="button">초대 링크 보내기</button></div><p class="small muted" id="linktxt" style="word-break:break-all"></p>`:''}
+  <ul class="plist">${v.players.map(p=>`<li><span>${esc(nameOf(p.id))}</span><span class="tagp">${p.id===v.hostId?'방장':''}</span></li>`).join('')}</ul>
+  ${host?`
+    <div class="field"><label for="memT">암기 시간</label><select id="memT">${[10,20,30,45,60].map(s=>`<option value="${s}"${s===v.memT?' selected':''}>${s}초</option>`).join('')}</select></div>
+    <div class="field"><label for="selT">선택 시간</label><select id="selT">${[10,20,30,45,60].map(s=>`<option value="${s}"${s===v.selT?' selected':''}>${s}초</option>`).join('')}</select></div>
+    <button class="btn" id="start" type="button" style="margin-top:16px"${v.players.length<2?' disabled':''}>${v.players.length<2?'2명 이상 모이면 시작할 수 있어요':'게임 시작'}</button>
+    <p class="small muted" style="margin-top:10px">방장이 이 화면을 닫으면 게임이 끝나요. 게임 중에는 화면을 켜 두세요.</p>`
+  :`<p class="muted">방장이 시작하면 모두에게 동시에 카드가 보입니다.</p>`}`;
+  bindLeave();
+  if(host){
+    app.querySelector('#linktxt').textContent=roomLink();
+    app.querySelector('#share').onclick=shareLink;
+    app.querySelector('#memT').onchange=e=>{H.memT=+e.target.value;hostBroadcast()};
+    app.querySelector('#selT').onchange=e=>{H.selT=+e.target.value;hostBroadcast()};
+    app.querySelector('#start').onclick=hostStart;
+  }
+}
+async function shareLink(){
+  const url=roomLink(),b=app.querySelector('#share');
+  if(navigator.share){try{await navigator.share({title:'기억 포커',text:`기억 포커 방 ${NET.code}에 들어와!`,url});return}catch(e){if(e.name==='AbortError')return}}
+  try{await navigator.clipboard.writeText(url);b.textContent='링크를 복사했어요'}catch(e){b.textContent='위 링크를 길게 눌러 복사하세요'}
+  setTimeout(()=>{if(b.isConnected)b.textContent='초대 링크 보내기'},2500);
+}
+function renderSpectate(){
+  app.innerHTML=`${roomHeader()}<div class="handoff"><p class="muted">라운드 진행 중</p><div class="who">잠시만요</div>
+  <p class="small muted">이번 라운드가 끝나면 다음 라운드부터 함께 합니다.</p></div>`;bindLeave();
+}
+function renderOnMemorize(){
+  const v=NET.view;
+  app.innerHTML=`
+  <div class="bar"><h2>카드를 외우세요</h2><span class="timer">${v.memT}</span></div>
+  <div class="track"><i style="width:100%"></i></div>
+  <div class="grid">${v.board.map((c,i)=>cardHTML(c,{letter:LETTERS[i]})).join('')}</div>
+  <p class="small muted" style="margin-top:12px">시간이 끝나면 모든 플레이어의 카드가 동시에 뒤집힙니다.</p>`;
+  netTick();
+}
+function renderOnSelect(){
+  const v=NET.view;
+  app.innerHTML=`
+  <div class="bar"><h2>2장을 고르세요</h2><span class="timer">${v.selT}</span></div>
+  <div class="track"><i style="width:100%"></i></div>
+  <p class="section-label">공개 카드</p>
+  <div class="community">${v.community.map(c=>cardHTML(c)).join('')}</div>
+  <div class="grid" id="g"></div>
+  <p class="small muted" style="margin:12px 0 4px"><span id="info"></span></p>
+  <p class="small muted" id="count" style="margin:0 0 8px">${countText()}</p>
+  <button class="btn" id="ok" type="button">이 2장으로 결정</button>`;
+  drawOnGrid();
+  app.querySelector('#ok').onclick=()=>{netSendPick([...NET.sel]);app.querySelector('#ok').disabled=true};
+  netTick();
+}
+function drawOnGrid(){
+  const gEl=app.querySelector('#g');
+  gEl.innerHTML=Array.from({length:16},(_,i)=>cardHTML(null,{down:true,letter:LETTERS[i],picked:NET.sel.includes(i),clickable:true,idx:i})).join('');
+  gEl.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.i;
+    if(NET.sel.includes(i))NET.sel=NET.sel.filter(x=>x!==i);
+    else if(NET.sel.length<2)NET.sel.push(i);
+    else NET.sel=[NET.sel[1],i];
+    drawOnGrid();app.querySelector(`[data-i="${i}"]`).focus();
+  });
+  app.querySelector('#info').textContent=NET.sel.length?`선택: ${NET.sel.map(i=>LETTERS[i]).join(', ')}`:'시간 안에 못 고르면 남은 칸은 무작위로 채워집니다.';
+  app.querySelector('#ok').disabled=NET.sel.length!==2||NET.submitting;
+}
+function renderOnWait(){
+  const v=NET.view;
+  app.innerHTML=`<div class="handoff"><p class="muted">제출 완료</p>
+  <div class="who">${v.myPick.map(x=>LETTERS[x]).join(' · ')}</div>
+  <p class="small muted" id="count">${countText()}</p>
+  <p class="small muted">모두 고르거나 시간이 끝나면 결과가 나옵니다.</p></div>`;
+}
+function renderOnResults(){
+  const v=NET.view;
+  const res=v.results.map(r=>{const cards=[...r.pk.map(x=>v.board[x]),...v.community];return{...r,cards,e:evaluate(cards)}}).sort((a,b)=>cmp(b.e,a.e));
+  let place=1;res.forEach((r,k)=>{if(k>0&&cmp(r.e,res[k-1].e)!==0)place=k+1;r.place=place});
+  const win=res.filter(r=>r.place===1);
+  const top=res[0];
+  const everyone=[...new Set([...v.players.map(p=>p.id),...res.map(r=>r.id)])];
+  const allPicked=new Set(res.flatMap(r=>r.pk));
+  const label=r=>esc(v.players.some(p=>p.id===r.id)?nameOf(r.id):r.name);
+  app.innerHTML=`${roomHeader()}
+  <h1>${!top?'결과 없음':win.length>1?'무승부':label(win[0])}</h1>
+  <p class="muted">${top?`${win.length>1?win.map(label).join(', ')+' 공동 1위':'라운드 승리'} · ${handName(top.e)}`:''} · ${v.round}라운드</p>
+  <div class="score">${everyone.map(id=>{const r=res.find(x=>x.id===id);return `<span>${r?label(r):esc(nameOf(id))} <b>${v.wins[id]||0}</b>승</span>`}).join('')}</div>
+  ${res.map(r=>`
+    <div class="result${r.place===1?' win':''}">
+      <div class="row"><div class="row"><span class="place">${r.place}</span><h2>${label(r)}</h2></div><span class="hand">${handName(r.e)}</span></div>
+      <div class="mini">${r.cards.map((c,k)=>cardHTML(c,{letter:k<2?LETTERS[r.pk[k]]:'',tag:k<2})).join('')}</div>
+      <p class="chosen">고른 카드 ${r.pk.map(x=>LETTERS[x]).join(', ')}${r.auto?' (시간 초과로 무작위)':''}</p>
+    </div>`).join('')}
+  <details><summary>전체 카드 보기</summary>
+    <p class="section-label" style="margin-top:10px">공개 카드</p>
+    <div class="community">${v.community.map(c=>cardHTML(c)).join('')}</div>
+    <div class="grid">${v.board.map((c,i)=>cardHTML(c,{letter:LETTERS[i],tag:true,cls:allPicked.has(i)?'hit':''})).join('')}</div>
+  </details>
+  <div class="stack" style="margin-top:20px">
+    ${isHost()?`<button class="btn" id="next" type="button"${v.players.length<2?' disabled':''}>${v.players.length<2?'2명 이상이어야 계속할 수 있어요':'다음 라운드'}</button>`
+      :`<p class="muted small">방장이 다음 라운드를 시작하면 바로 카드가 보입니다.</p>`}
+  </div>`;
+  bindLeave();
+  const n=app.querySelector('#next');if(n)n.onclick=hostStart;
+}
+window.addEventListener('beforeunload',e=>{if(NET.role==='host'&&H.players.length>1){e.preventDefault();e.returnValue=''}});
+
+renderHome();
+</script>
+</body>
+</html>
